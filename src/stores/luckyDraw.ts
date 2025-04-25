@@ -1,12 +1,22 @@
 import { defineStore } from 'pinia'
 import { ref, reactive } from 'vue'
 
+// 预设的颜色列表
+const predefinedColors = [
+  '#2B7BB9',
+  '#4C8DAE',
+  '#3A5B8C',
+  '#5B7FA6',
+  '#6E99B4',
+  '#4B6E8C',
+  '#5D8BA3'
+]
+
 interface PrizeFonts {
   text: string;
   top: string;
-  fontSize?: string;
-  fontWeight?: string;
-  fontColor?: string;
+  fontSize: string;
+  fontColor: string;
 }
 
 interface Prize {
@@ -17,13 +27,46 @@ interface Prize {
 export const useLuckyDrawStore = defineStore('luckyDraw', () => {
   // 从本地存储获取数据
   const getStoredPrizes = () => {
-    const stored = localStorage.getItem('luckyWheelPrizes')
-    return stored ? JSON.parse(stored) : {}
+    try {
+      const stored = localStorage.getItem('luckyWheelPrizes')
+      if (!stored) return {}
+      
+      const parsed = JSON.parse(stored)
+      // 清理数据，只保留必要的属性
+      const cleanedData: Record<string, Prize[]> = {}
+      
+      for (const key in parsed) {
+        if (Array.isArray(parsed[key])) {
+          cleanedData[key] = parsed[key].map((prize: any) => ({
+            background: prize.background || predefinedColors[Math.floor(Math.random() * predefinedColors.length)],
+            fonts: Array.isArray(prize.fonts) ? prize.fonts.map((font: any) => ({
+              text: String(font.text || ''),
+              top: String(font.top || '40%'),
+              fontSize: String(font.fontSize || '18px'),
+              fontColor: '#ffffff'
+            })) : [{
+              text: '',
+              top: '40%',
+              fontSize: '18px',
+              fontColor: '#ffffff'
+            }]
+          }))
+        }
+      }
+      return cleanedData
+    } catch (error) {
+      console.error('Error parsing stored prizes:', error)
+      return {}
+    }
   }
 
   // 保存到本地存储
   const saveToStorage = (prizes: Record<string, Prize[]>) => {
-    localStorage.setItem('luckyWheelPrizes', JSON.stringify(prizes))
+    try {
+      localStorage.setItem('luckyWheelPrizes', JSON.stringify(prizes))
+    } catch (error) {
+      console.error('Error saving prizes:', error)
+    }
   }
 
   // 使用 reactive 创建响应式数据
@@ -34,13 +77,31 @@ export const useLuckyDrawStore = defineStore('luckyDraw', () => {
 
   // 更新奖项数据
   const updatePrizes = (option: string, prizes: Prize[]) => {
-    prizeOptions[option] = prizes
+    if (!prizes || !Array.isArray(prizes)) return
+    prizeOptions[option] = prizes.map(prize => ({
+      background: prize.background || predefinedColors[Math.floor(Math.random() * predefinedColors.length)],
+      fonts: [{
+        text: String(prize.fonts[0]?.text || ''),
+        top: '40%',
+        fontSize: '18px',
+        fontColor: '#ffffff'
+      }]
+    }))
     saveToStorage(prizeOptions)
   }
 
   // 添加新标签
   const addNewTag = (tagName: string, prizes: Prize[]) => {
-    prizeOptions[tagName] = prizes
+    if (!prizes || !Array.isArray(prizes)) return
+    prizeOptions[tagName] = prizes.map(prize => ({
+      background: prize.background || predefinedColors[Math.floor(Math.random() * predefinedColors.length)],
+      fonts: [{
+        text: String(prize.fonts[0]?.text || ''),
+        top: '40%',
+        fontSize: '18px',
+        fontColor: '#ffffff'
+      }]
+    }))
     currentOption.value = tagName
     saveToStorage(prizeOptions)
   }
@@ -79,8 +140,5 @@ export const useLuckyDrawStore = defineStore('luckyDraw', () => {
     deleteTag
   }
 }, {
-    persist: {
-        key: 'luckyWheelPrizes',
-        storage: localStorage
-      }
+  persist: true
 })

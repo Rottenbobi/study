@@ -74,95 +74,37 @@
     </div>
 
     <!-- 编辑弹窗 -->
-    <a-modal
-      v-model:visible="isEditDialogVisible"
+    <prize-edit-modal
+      v-model="isEditDialogVisible"
+      v-model:prizes="editingPrizes"
       title="编辑奖项"
-      @ok="handleEditConfirm"
-      @cancel="handleEditCancel"
-      :mask-closable="false"
-    >
-      <div class="edit-form">
-        <div v-for="(prize, index) in editingPrizes" :key="index" class="prize-item">
-          <a-input-group compact>
-            <a-input
-              v-model="prize.fonts[0].text"
-              placeholder="奖项名称"
-              style="width: 60%"
-            />
-            <a-input-color
-              v-model="prize.background"
-              allow-clear
-              style="width: 30%"
-            />
-            <a-button
-              type="text"
-              status="danger"
-              @click="removePrize(index)"
-              v-if="editingPrizes.length > 2"
-            >
-              <template #icon><icon-delete /></template>
-            </a-button>
-          </a-input-group>
-        </div>
-
-        <!-- 添加奖项按钮 -->
-        <div class="add-prize">
-          <a-button type="dashed" long @click="addPrize">
-            <template #icon><icon-plus /></template>
-            添加奖项
-          </a-button>
-        </div>
-      </div>
-    </a-modal>
+      placeholder="奖项名称"
+      add-button-text="添加奖项"
+      :min-items="2"
+      @confirm="handleEditConfirm"
+    />
 
     <!-- 标签编辑弹窗 -->
-    <a-modal
-      v-model:visible="isTagEditDialogVisible"
+    <prize-edit-modal
+      v-model="isTagEditDialogVisible"
+      v-model:prizes="newTagPrizes"
       title="添加新标签"
-      @ok="handleTagEditConfirm"
-      @cancel="handleTagEditCancel"
-      :mask-closable="false"
+      placeholder="请输入选项名称"
+      add-button-text="添加选项"
+      :min-items="1"
+      @confirm="handleTagEditConfirm"
     >
-      <div class="edit-form">
-        <div class="prize-item">
+      <template #header>
+        <div class="form-group">
+          <div class="form-label">标签名称</div>
           <a-input
             v-model="newTagName"
-            placeholder="标签名称"
-            style="width: 100%"
+            placeholder="请输入标签名称"
+            allow-clear
           />
         </div>
-        <div v-for="(prize, index) in newTagPrizes" :key="index" class="prize-item">
-          <a-input-group compact>
-            <a-input
-              v-model="prize.fonts[0].text"
-              placeholder="选项名称"
-              style="width: 60%"
-            />
-            <a-input-color
-              v-model="prize.background"
-              allow-clear
-              style="width: 30%"
-            />
-            <a-button
-              type="text"
-              status="danger"
-              @click="removePrizeFromNewTag(index)"
-              v-if="newTagPrizes.length > 1"
-            >
-              <template #icon><icon-delete /></template>
-            </a-button>
-          </a-input-group>
-        </div>
-
-        <!-- 添加选项按钮 -->
-        <div class="add-prize">
-          <a-button type="dashed" long @click="addPrizeToNewTag">
-            <template #icon><icon-plus /></template>
-            添加选项
-          </a-button>
-        </div>
-      </div>
-    </a-modal>
+      </template>
+    </prize-edit-modal>
   </div>
 </template>
 
@@ -171,6 +113,7 @@ import { ref, computed } from 'vue'
 import { Message } from '@arco-design/web-vue'
 import { IconEdit, IconDelete, IconPlus } from '@arco-design/web-vue/es/icon'
 import { useLuckyDrawStore } from '@/stores/luckyDraw'
+import PrizeEditModal from '@/components/PrizeEditModal.vue'
 
 interface PrizeFonts {
   text: string;
@@ -261,11 +204,10 @@ const isEditDialogVisible = ref(false)
 // 编辑时的临时数据
 const editingPrizes = ref<Prize[]>([])
 
-// 显示编辑弹窗
-const showEditDialog = () => {
-  // 深拷贝当前奖项数据
-  editingPrizes.value = JSON.parse(JSON.stringify(currentPrizes.value))
-  isEditDialogVisible.value = true
+// 移除原有的编辑相关方法，改用组件提供的功能
+const handleEditConfirm = (prizes: Prize[]) => {
+  store.updatePrizes(store.currentOption, prizes)
+  Message.success('保存成功')
 }
 
 // 预设的颜色列表
@@ -278,62 +220,6 @@ const predefinedColors = [
   '#4B6E8C',
   '#5D8BA3'
 ]
-
-// 添加新奖项
-const addPrize = () => {
-  const newPrize: Prize = {
-    fonts: [{ 
-      text: '新奖项', 
-      top: '40%',
-      fontSize: '18px',
-      fontWeight: '600',
-      fontColor: '#ffffff'
-    }],
-    background: predefinedColors[Math.floor(Math.random() * predefinedColors.length)]
-  }
-  editingPrizes.value.push(newPrize)
-}
-
-// 删除奖项
-const removePrize = (index: number) => {
-  if (editingPrizes.value.length <= 2) {
-    Message.warning('至少需要保留2个奖项')
-    return
-  }
-  editingPrizes.value.splice(index, 1)
-}
-
-// 确认编辑
-const handleEditConfirm = () => {
-  // 验证数据
-  if (editingPrizes.value.some((prize: Prize) => !prize.fonts[0].text.trim())) {
-    Message.error('奖项名称不能为空')
-    return
-  }
-  
-  // 更新奖项数据
-  const updatedPrizes: Prize[] = editingPrizes.value.map((prize: Prize) => ({
-    background: prize.background,
-    fonts: prize.fonts.map((font: PrizeFonts) => ({
-      text: font.text,
-      top: font.top,
-      fontSize: font.fontSize || '18px',
-      fontWeight: font.fontWeight || '600',
-      fontColor: font.fontColor || '#ffffff'
-    }))
-  }))
-
-  // 使用 store 更新数据
-  store.updatePrizes(store.currentOption, updatedPrizes)
-  
-  isEditDialogVisible.value = false
-  Message.success('保存成功')
-}
-
-// 取消编辑
-const handleEditCancel = () => {
-  isEditDialogVisible.value = false
-}
 
 // 标签编辑弹窗状态
 const isTagEditDialogVisible = ref(false)
@@ -356,33 +242,8 @@ const showTagEditDialog = () => {
   isTagEditDialogVisible.value = true
 }
 
-// 添加新选项到新标签
-const addPrizeToNewTag = () => {
-  const newPrize: Prize = {
-    fonts: [{ 
-      text: '新选项', 
-      top: '40%',
-      fontSize: '18px',
-      fontWeight: '600',
-      fontColor: '#ffffff'
-    }],
-    background: predefinedColors[Math.floor(Math.random() * predefinedColors.length)]
-  }
-  newTagPrizes.value.push(newPrize)
-}
-
-// 删除新标签中的选项
-const removePrizeFromNewTag = (index: number) => {
-  if (newTagPrizes.value.length <= 1) {
-    Message.warning('至少需要保留1个选项')
-    return
-  }
-  newTagPrizes.value.splice(index, 1)
-}
-
-// 确认添加新标签
-const handleTagEditConfirm = () => {
-  // 验证数据
+// 移除原有的编辑相关方法，改用组件提供的功能
+const handleTagEditConfirm = (prizes: Prize[]) => {
   if (!newTagName.value.trim()) {
     Message.error('标签名称不能为空')
     return
@@ -391,21 +252,15 @@ const handleTagEditConfirm = () => {
     Message.error('标签名称已存在')
     return
   }
-  if (newTagPrizes.value.some((prize: Prize) => !prize.fonts[0].text.trim())) {
-    Message.error('选项名称不能为空')
-    return
-  }
 
-  // 使用 store 添加新标签
-  store.addNewTag(newTagName.value, newTagPrizes.value)
-  
-  isTagEditDialogVisible.value = false
+  store.addNewTag(newTagName.value, prizes)
   Message.success('添加成功')
 }
 
-// 取消添加新标签
-const handleTagEditCancel = () => {
-  isTagEditDialogVisible.value = false
+// 显示编辑弹窗
+const showEditDialog = () => {
+  editingPrizes.value = JSON.parse(JSON.stringify(currentPrizes.value))
+  isEditDialogVisible.value = true
 }
 </script>
 
@@ -413,18 +268,23 @@ const handleTagEditCancel = () => {
 .page-container {
   min-height: 100vh;
   background: linear-gradient(135deg, #F5F7FF 0%, #FFF1F9 100%);
-  padding: 40px 20px;
+  padding: 20px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .luck-draw-container {
+  width: 100%;
   max-width: 800px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 40px;
+  padding: 20px;
   background: rgba(255, 255, 255, 0.98);
-  border-radius: 30px;
+  border-radius: 20px;
   box-shadow: 
     0 20px 40px rgba(43, 91, 140, 0.15),
     0 5px 15px rgba(43, 91, 140, 0.1);
@@ -433,58 +293,64 @@ const handleTagEditCancel = () => {
 
 .title-section {
   text-align: center;
-  margin-bottom: 40px;
+  margin-bottom: 20px;
+  width: 100%;
 }
 
 .title-section h1 {
-  font-size: 38px;
+  font-size: clamp(24px, 5vw, 38px);
   color: #2B5B8C;
-  margin-bottom: 15px;
+  margin-bottom: 10px;
   font-weight: bold;
   letter-spacing: 1px;
 }
 
 .subtitle {
-  font-size: 16px;
+  font-size: clamp(14px, 3vw, 16px);
   color: #4C8DAE;
   font-weight: 500;
 }
 
 .options-section {
-  margin-bottom: 40px;
+  margin-bottom: 20px;
   display: flex;
   justify-content: center;
-  gap: 20px;
+  gap: 10px;
   flex-wrap: wrap;
+  width: 100%;
+  padding: 0 10px;
 }
 
 .option-btn {
-  height: 40px;
-  padding: 0 20px;
-  border-radius: 20px;
-  font-size: 16px;
+  height: 36px;
+  padding: 0 15px;
+  border-radius: 18px;
+  font-size: clamp(14px, 3vw, 16px);
   display: flex;
   align-items: center;
   gap: 5px;
-}
-
-.option-btn :deep(.icon) {
-  font-size: 16px;
+  white-space: nowrap;
 }
 
 .wheel-wrapper {
   position: relative;
-  padding: 25px;
+  padding: 15px;
   border-radius: 50%;
   background: rgba(43, 91, 140, 0.03);
   box-shadow: 
     0 10px 30px rgba(43, 91, 140, 0.2),
     inset 0 0 40px rgba(43, 91, 140, 0.1);
   transition: transform 0.3s ease;
+  width: min(90vw, 400px);
+  height: min(90vw, 400px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.wheel-wrapper:hover {
-  transform: translateY(-5px);
+.wheel-wrapper :deep(.lucky-wheel) {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .empty-state {
@@ -506,13 +372,14 @@ const handleTagEditCancel = () => {
   align-items: center;
   z-index: 1000;
   backdrop-filter: blur(8px);
+  padding: 20px;
 }
 
 .modal-content {
   background: rgba(255, 255, 255, 0.98);
-  padding: 35px;
+  padding: 25px;
   border-radius: 20px;
-  width: 380px;
+  width: min(90vw, 380px);
   text-align: center;
   box-shadow: 
     0 20px 40px rgba(43, 91, 140, 0.2),
@@ -571,10 +438,11 @@ const handleTagEditCancel = () => {
 }
 
 .prize-text {
-  font-size: 32px;
+  font-size: clamp(24px, 6vw, 32px);
   color: #2B5B8C;
   font-weight: bold;
   margin: 15px 0;
+  word-break: break-all;
 }
 
 .modal-footer {
@@ -599,32 +467,450 @@ const handleTagEditCancel = () => {
 }
 
 .edit-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+  width: 100%;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.edit-form::-webkit-scrollbar {
+  width: 8px;
+}
+
+.edit-form::-webkit-scrollbar-track {
+  background: rgba(43, 91, 140, 0.05);
+  border-radius: 4px;
+}
+
+.edit-form::-webkit-scrollbar-thumb {
+  background: rgba(43, 91, 140, 0.2);
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.edit-form::-webkit-scrollbar-thumb:hover {
+  background: rgba(43, 91, 140, 0.3);
 }
 
 .prize-item {
-  display: flex;
+  margin-bottom: 16px;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.prize-item:hover {
+  transform: translateX(2px);
+}
+
+:deep(.arco-input-wrapper) {
+  border-radius: 8px;
+  border: 1px solid #E5E6EB;
+  transition: all 0.2s ease;
+  background: #F7F8FA;
+}
+
+:deep(.arco-input-wrapper:hover) {
+  border-color: #2B5B8C;
+  background: #fff;
+}
+
+:deep(.arco-input-wrapper:focus-within) {
+  border-color: #2B5B8C;
+  box-shadow: none;
+  background: #fff;
+}
+
+.option-item {
+  display: grid;
+  grid-template-columns: 1fr 80px 32px;
+  gap: 8px;
   align-items: center;
-  gap: 0.5rem;
+  padding: 12px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  background: transparent;
 }
 
-.add-prize {
-  margin-top: 1rem;
+.option-item:hover {
+  background: rgba(43, 91, 140, 0.04);
 }
 
-:deep(.arco-modal-content) {
-  max-height: 60vh;
-  overflow-y: auto;
+:deep(.arco-input) {
+  background: transparent;
+}
+
+:deep(.arco-input:hover),
+:deep(.arco-input:focus) {
+  background: transparent;
+}
+
+.color-picker {
+  width: 80px;
+  border: none;
 }
 
 :deep(.arco-input-group) {
-  display: flex;
-  align-items: center;
+  background: transparent;
+  box-shadow: none;
 }
 
-:deep(.arco-btn-dashed) {
-  border-style: dashed;
+:deep(.arco-input-group:hover) {
+  background: transparent;
+  box-shadow: none;
+}
+
+.add-prize {
+  margin-top: 20px;
+}
+
+:deep(.arco-btn-text) {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: #FF4D4F;
+  transition: all 0.2s ease;
+}
+
+:deep(.arco-btn-text:hover) {
+  background: rgba(255, 77, 79, 0.1);
+  transform: scale(1.05);
+}
+
+.add-option-btn {
+  margin-top: 12px;
+  height: 40px;
+  border: 1px dashed #C9CDD4;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #4E5969;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.add-option-btn:hover {
+  border-color: #2B5B8C;
+  color: #2B5B8C;
+  background: rgba(43, 91, 140, 0.04);
+}
+
+.form-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid #E5E6EB;
+}
+
+:deep(.arco-btn) {
+  height: 36px;
+  padding: 0 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 取消按钮样式 */
+.form-footer :deep(.arco-btn:not(.arco-btn-primary)) {
+  background: #F7F8FA;
+  border: 1px solid #E5E6EB;
+  color: #4E5969;
+}
+
+.form-footer :deep(.arco-btn:not(.arco-btn-primary):hover) {
+  color: #2B5B8C;
+  border-color: #2B5B8C;
+  background: rgba(43, 91, 140, 0.04);
+}
+
+/* 确定按钮样式 */
+.form-footer :deep(.arco-btn-primary) {
+  background: linear-gradient(135deg, #3A5B8C 0%, #2B5B8C 100%);
+  border: none;
+  box-shadow: 0 2px 6px rgba(43, 91, 140, 0.2);
+}
+
+.form-footer :deep(.arco-btn-primary:hover) {
+  background: linear-gradient(135deg, #4C6B9C 0%, #3A6B9C 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(43, 91, 140, 0.3);
+}
+
+/* 添加选项按钮样式 */
+.add-option-btn {
+  margin-top: 12px;
+  height: 40px;
+  border: 1px dashed #C9CDD4;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #4E5969;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #F7F8FA;
+}
+
+.add-option-btn:hover {
+  border-color: #2B5B8C;
+  color: #2B5B8C;
+  background: rgba(43, 91, 140, 0.04);
+  transform: translateY(-1px);
+}
+
+/* 删除按钮样式 */
+.delete-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #C9CDD4;
+  transition: all 0.2s ease;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.delete-btn:hover {
+  color: #F53F3F;
+  background: rgba(245, 63, 63, 0.08);
+  transform: scale(1.05);
+}
+
+/* 移动端适配 */
+@media (max-width: 480px) {
+  .form-footer :deep(.arco-btn) {
+    padding: 0 16px;
+  }
+  
+  .add-option-btn {
+    height: 36px;
+  }
+}
+
+/* 适配横屏 */
+@media (orientation: landscape) and (max-height: 600px) {
+  .page-container {
+    min-height: 100%;
+    padding: 10px;
+  }
+
+  .luck-draw-container {
+    padding: 15px;
+  }
+
+  .title-section {
+    margin-bottom: 10px;
+  }
+
+  .options-section {
+    margin-bottom: 10px;
+  }
+
+  .wheel-wrapper {
+    width: min(70vh, 400px);
+    height: min(70vh, 400px);
+  }
+}
+
+.tag-edit-form {
+  padding: 0;
+}
+
+.form-header {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1D2129;
+  padding: 20px 24px;
+  border-bottom: 1px solid #E5E6EB;
+  margin: 0 -20px 20px;
+}
+
+.form-group {
+  margin-bottom: 24px;
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+.form-label {
+  font-size: 14px;
+  color: #4E5969;
+  margin-bottom: 8px;
+}
+
+.options-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.delete-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #C9CDD4;
+  transition: all 0.2s ease;
+}
+
+.delete-btn:hover {
+  color: #F53F3F;
+  background: rgba(245, 63, 63, 0.1);
+}
+
+/* 列表动画效果 */
+.list-move,
+.list-enter-active,
+.list-leave-active {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.list-enter-from {
+  opacity: 0;
+  transform: translateX(-30px) scale(0.9);
+}
+
+.list-leave-to {
+  opacity: 0;
+  transform: translateX(30px) scale(0.9);
+}
+
+.list-leave-active {
+  position: absolute;
+  width: 100%;
+}
+
+/* 添加按钮动画 */
+.add-option-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.add-option-btn::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, rgba(43, 91, 140, 0.1) 0%, transparent 70%);
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.add-option-btn:active::after {
+  transform: translate(-50%, -50%) scale(2);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 删除按钮动画 */
+.delete-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.delete-btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, rgba(245, 63, 63, 0.1) 0%, transparent 70%);
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.delete-btn:hover::before {
+  transform: translate(-50%, -50%) scale(2);
+}
+
+.delete-btn:active::before {
+  background: radial-gradient(circle, rgba(245, 63, 63, 0.2) 0%, transparent 70%);
+}
+
+/* 选项卡片动画 */
+.option-item {
+  animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 点击涟漪效果 */
+.option-item {
+  position: relative;
+  overflow: hidden;
+}
+
+.option-item::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, rgba(43, 91, 140, 0.06) 0%, transparent 70%);
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.option-item:active::after {
+  transform: translate(-50%, -50%) scale(2);
+}
+
+/* 输入框聚焦动画 */
+:deep(.arco-input-wrapper) {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:deep(.arco-input-wrapper:focus-within) {
+  transform: translateY(-1px);
+}
+
+/* 颜色选择器动画 */
+.color-picker {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.color-picker:hover {
+  transform: translateY(-1px) scale(1.02);
+}
+
+/* 移动端优化 */
+@media (max-width: 480px) {
+  .list-enter-from {
+    transform: translateX(-20px) scale(0.95);
+  }
+
+  .list-leave-to {
+    transform: translateX(20px) scale(0.95);
+  }
 }
 </style>
